@@ -1,0 +1,27 @@
+{
+  "test": {
+    "pass": "576f99ct",
+    "hash": "554dc6a32f498e627eec99531fa3e506dcc24c8244a734348065078b02d2f86b",
+    "randomNumber": "710546"
+  },
+  "test1": {
+    "pass": "xssi5dy3",
+    "hash": "e5e89ffe03e5b69c270d607d5594f06da7575e96197808da6173d252525e1ddf",
+    "randomNumber": "475179"
+  },
+  "test2": {
+    "pass": "d7moy6se",
+    "hash": "85ffd2fa64c0e0f884fca0075c1e597d32a3e4d84970db2f03076c87f34ce163",
+    "randomNumber": "377504"
+  },
+  "test3": {
+    "pass": "ov9k236m",
+    "hash": "949be20f479f3e9ef67973627dc97710aa69f1a081d43ad61b73c0316cb93788",
+    "randomNumber": "745160"
+  },
+  "test4": {
+    "pass": "r33eyjmk",
+    "hash": "d4d4ca47180fe3be77269ef507e09f39d6e90a3ec37f4fdac8f5fa83cdd90a4b",
+    "randomNumber": "80034"
+  }
+}

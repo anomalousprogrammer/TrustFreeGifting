@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>Node.js Server Example</title>
+    <style>
+      /* styles.css */
+      body {
+        font-family: Arial, sans-serif;
+        background: #f8f8f8;
+        margin: 0;
+        padding: 20px;
+      }
+      h1 {
+        color: #333;
+      }
+      button {
+        padding: 10px 15px;
+        margin: 10px 0;
+        font-size: 1rem;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Get a derrangment without trusting a third party experiment. For secret santa and the like! WIP</h1>
+    <hr />
+    <p id="statusMsg"></p>
+
+    <script>
+      /*************************************************************
+       * Derangement / Subfactorial Functions
+       *************************************************************/
+       function subfactorial(n) {
+        let factorial = 1;
+        for (let i = 2; i <= n; i++) {
+          factorial *= i;
+        }
+
+        let sum = 0;
+        for (let k = 0; k <= n; k++) {
+          let kFactorial = 1;
+          for (let j = 2; j <= k; j++) {
+            kFactorial *= j;
+          }
+          sum += ((-1) ** k) / kFactorial;
+        }
+        return Math.round(factorial * sum);
+      }
+
+      function createDpTable(n) {
+        const dpSize = n * (1 << n);
+        const dpMemo = new Array(dpSize).fill(-1);
+
+        function stateIndex(i, used) {
+          return i * (1 << n) + used;
+        }
+
+        function countDerangements(i, used) {
+          if (i === n) {
+            return used === (1 << n) - 1 ? 1 : 0;
+          }
+          const idx = stateIndex(i, used);
+          if (dpMemo[idx] !== -1) {
+            return dpMemo[idx];
+          }
+
+          let ways = 0;
+          for (let c = 0; c < n; c++) {
+            if (c !== i && (used & (1 << c)) === 0) {
+              ways += countDerangements(i + 1, used | (1 << c));
+            }
+          }
+          dpMemo[idx] = ways;
+          return ways;
+        }
+
+        countDerangements(0, 0);
+        return (i, used) => dpMemo[stateIndex(i, used)];
+      }
+
+      function nthDerangement(n, a) {
+        const totalDer = subfactorial(n);
+        a = a % totalDer;
+
+        const dp = createDpTable(n);
+        const result = new Array(n);
+        let used = 0;
+
+        for (let i = 0; i < n; i++) {
+          for (let c = 0; c < n; c++) {
+            if (c !== i && (used & (1 << c)) === 0) {
+              const countIfChosen = dp(i + 1, used | (1 << c));
+              if (a < countIfChosen || i == n - 1) {
+                result[i] = c;
+                used |= (1 << c);
+                break;
+              } else {
+                a -= countIfChosen;
+              }
+            }
+          }
+        }
+        return result;
+      }
+
+
+      /*************************************************************
+       * Trust free random proceedure
+       *************************************************************/
+      const urlParams = new URLSearchParams(window.location.search);
+      const userPass = urlParams.get('pass');
+      /**
+       * Hash a message using SHA-256 and return a hex string.
+       */
+      async function hashMessage(message) {
+        const msgUint8 = new TextEncoder().encode(message);
+        const hashBuffer = await crypto.subtle.digest('SHA-256', msgUint8);
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+        return hashHex;
+      }
+
+      /**
+       * Send the hashed value to the server along with the user's pass code.
+       */
+      async function storeHashOnServer(hashValue) {
+        if (!userPass) {
+          throw new Error('No "pass" query parameter provided in the URL.');
+        }
+        return await fetch(`/store-hash?pass=${encodeURIComponent(userPass)}&hash=${encodeURIComponent(hashValue)}`);
+      }
+
+      async function storeRandomNumberOnServer(randomNumber) {
+
+        if (!userPass) {
+          throw new Error('No "pass" query parameter provided in the URL.');
+        }
+
+        return await fetch(`/store-random-number?pass=${encodeURIComponent(userPass)}&random=${encodeURIComponent(randomNumber)}`);
+      }
+      
+      async function sendHashValue(hash){
+        try {
+          // Send hash + pass to the server
+          const response = await storeHashOnServer(hash);
+          if (!response.ok) {
+            const errMsg = await response.text();
+            throw new Error('Server error: ' + errMsg);
+            return;
+          }
+          const responseJson = await response.json();
+          return responseJson;
+          // Inform the user
+        } catch (err) {
+          console.error(err);
+        }
+      }
+
+      async function sendRandomNumber(randomNumber){
+        try {
+          // Send hash + pass to the server
+          const response = await storeRandomNumberOnServer(randomNumber);
+          if (!response.ok) {
+            const errMsg = await response.text();
+            throw new Error('Server error: ' + errMsg);
+            return;
+          }
+          const responseJson = await response.json();
+          return responseJson;
+          // Inform the user
+        } catch (err) {
+          console.error(err);
+        }
+      }
+
+      async function tryGettingHashValues(hashValue) {
+        while (true) {
+          const usersHashData = await sendHashValue(hashValue);
+          if (usersHashData.every(userObject => userObject.hash)) {
+            return usersHashData;
+          }
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+        }
+      }
+
+      async function tryGettingRandomNumbers(randomNumber) {
+        while (true) {
+          const usersRandomData = await sendRandomNumber(randomNumber);
+          if (usersRandomData.every(userObject => userObject.randomNumber)) {
+            return usersRandomData;
+          }
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+        }
+      }
+
+      async function getGiftTarget(){
+        document.getElementById("statusMsg");
+        const randomNumber = localStorage.getItem(userPass + "-random") || Math.floor(Math.random() * 1_000_000);
+        localStorage.setItem(userPass + "-random", randomNumber);
+        statusMsg.textContent = 'Generated Random Number, waiting for all participants to generate...';
+        const hashValue = await hashMessage(String(randomNumber));
+        const hashValues = localStorage.getItem(userPass + "-hash-values") ? JSON.parse(localStorage.getItem(userPass + "-hash-values")) : await tryGettingHashValues(hashValue);
+        localStorage.setItem(userPass + "-hash-values", JSON.stringify(hashValues));
+        const randomNumbers = await tryGettingRandomNumbers(String(randomNumber));
+        const hashValuesMap = new Map();
+        if(randomNumbers.length != hashValues.length){
+          statusMsg.textContent = "Somebody cheated? Number of users changed mid proceedure...";
+          return;
+        }
+        hashValues.forEach(hashValueObject => {
+          hashValuesMap.set(hashValueObject.userName, hashValueObject.hash);
+        })
+        for(let i = 0; i < randomNumbers.length; i++){
+          const hashValueI = await hashMessage(String(randomNumbers[i].randomNumber));
+          console.log(hashValueI)
+          console.log(hashValuesMap.get(randomNumbers[i].userName))
+          if(hashValuesMap.get(randomNumbers[i].userName) != hashValueI){
+            statusMsg.textContent = "Somebody cheated? Hashes dont match random numbers...";
+            return;
+          }
+        }
+        //Use hash of all random values to get final selection of derrangement
+        const finalRandomValue = await hashMessage(randomNumbers.map(randomNumberObject => String(randomNumberObject.randomNumber)).join(""));
+        const resultingRandomInt = parseInt(finalRandomValue.slice(0, 15), 16);
+        const derrangement = nthDerangement(randomNumbers.length, resultingRandomInt);
+
+        // Get current user's name and find who they are giving to based on the derrangement
+        const currentUserName = hashValues.find(hashValueObject => hashValueObject.hash === hashValue).userName;
+        const sortedUsers = hashValues.sort((a,b) => a.hash < b.hash).map(hashValueObject => hashValueObject.userName);
+        const currentUserIndex = sortedUsers.findIndex(user => user === currentUserName)
+
+        statusMsg.textContent = "Congrats! " + currentUserName + ", you are giving to " + sortedUsers[derrangement[currentUserIndex]] + ".";
+      }
+      
+      getGiftTarget()
+    </script>
+  </body>
+</html>

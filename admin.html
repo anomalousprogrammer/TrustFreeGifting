@@ -1,0 +1,107 @@
+<!-- admin.html -->
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>Admin Panel</title>
+    <style>
+      body { font-family: Arial, sans-serif; }
+      #userList { margin-top: 20px; }
+    </style>
+  </head>
+  <body>
+    <h1>Admin Panel</h1>
+    <div>
+      <label for="usernameInput">Username:</label>
+      <input type="text" id="usernameInput" placeholder="e.g., Alice" />
+      <button id="generateBtn">Generate Link</button>
+    </div>
+
+    <h2>Current User Data</h2>
+    <div id="userList"></div>
+
+    <script>
+      const generateBtn = document.getElementById('generateBtn');
+      const usernameInput = document.getElementById('usernameInput');
+      const userListDiv = document.getElementById('userList');
+
+      // Extract the admin pass from the URL
+      const urlParams = new URLSearchParams(window.location.search);
+      const adminPass = urlParams.get('pass');
+
+      async function removeUser(userName){
+        try {
+          const response = await fetch(`/remove-user?pass=${encodeURIComponent(adminPass)}&user=${encodeURIComponent(userName)}`);
+          if (!response.ok) {
+            throw new Error(await response.text());
+          }
+          const data = await response.json();
+          displayUserData(data);
+        } catch (err) {
+          console.error(err);
+          alert('Failed to load user data: ' + err.message);
+        }
+      }
+
+      // 1. On page load, fetch the current valid userData
+      async function loadUserData() {
+        try {
+          const response = await fetch(`/get-user-data?pass=${encodeURIComponent(adminPass)}`);
+          if (!response.ok) {
+            throw new Error(await response.text());
+          }
+          const data = await response.json();
+          displayUserData(data);
+        } catch (err) {
+          console.error(err);
+          alert('Failed to load user data: ' + err.message);
+        }
+      }
+
+      // 2. Display user => pass codes as *clickable links*
+      function displayUserData(userDataObj) {
+        let html = '<ul>';
+        for (const [user, dataObject] of Object.entries(userDataObj)) {
+          const passCode = dataObject.pass;
+          const link = `${window.location.origin}/index.html?pass=${encodeURIComponent(passCode)}`;
+          html += `
+            <li>
+              <strong>${user}:</strong>
+              <a href="${link}" target="_blank">${link}</a>
+              <button onclick="removeUser('${user}')">x</button>
+            </li>`;
+        }
+        html += '</ul>';
+        userListDiv.innerHTML = html;
+      }
+
+      // 3. Generate a new pass for a user
+      generateBtn.addEventListener('click', async () => {
+        const username = usernameInput.value.trim();
+        if (!username) {
+          alert('Please enter a username.');
+          return;
+        }
+        try {
+          // Hit the /generate-link endpoint
+          const response = await fetch(
+            `/generate-link?pass=${encodeURIComponent(adminPass)}&user=${encodeURIComponent(username)}`
+          );
+          if (!response.ok) {
+            throw new Error(await response.text());
+          }
+          const data = await response.json();
+
+          // Re-load the user data so we see the newly added user
+          loadUserData();
+        } catch (err) {
+          console.error(err);
+          alert('Failed to generate link: ' + err.message);
+        }
+      });
+
+      // Initialize
+      loadUserData();
+    </script>
+  </body>
+</html>
